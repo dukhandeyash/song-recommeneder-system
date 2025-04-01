@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mb-5">
+    <div class="col-md-12 text-center">
+        <h1 class="display-4 mb-4">Welcome to MoodMix</h1>
+        <p class="lead">First-time setup required</p>
+    </div>
+</div>
+
+<div class="row mb-5">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title">Model Training Required</h2>
+                <p>Before you can use MoodMix, we need to train the recommendation model using your dataset. This may take a few minutes.</p>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>This will process the Spotify dataset and create recommendation models.
+                </div>
+                
+                <button id="start-training-btn" class="btn btn-primary">
+                    <i class="fas fa-cogs me-2"></i>Start Training
+                </button>
+                
+                <div id="training-status" class="mt-3" style="display: none;">
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                    </div>
+                    <p class="mt-2">Training in progress. This may take a few minutes. The page will refresh automatically when training is complete.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        $('#start-training-btn').click(function() {
+            $(this).prop('disabled', true);
+            $('#training-status').show();
+            
+            $.ajax({
+                url: '/setup',
+                type: 'POST',
+                success: function(response) {
+                    console.log(response);
+                    // Check status every 5 seconds
+                    checkTrainingStatus();
+                },
+                error: function(error) {
+                    console.error('Error starting training:', error);
+                    $('#training-status').html('<div class="alert alert-danger">Error starting training. Please try again.</div>');
+                    $('#start-training-btn').prop('disabled', false);
+                }
+            });
+        });
+        
+        function checkTrainingStatus() {
+            // Check if the models directory exists every 5 seconds
+            setTimeout(function() {
+                $.ajax({
+                    url: '/',
+                    type: 'GET',
+                    success: function(response) {
+                        // If the response doesn't contain the setup page, training is complete
+                        if (!response.includes('start-training-btn')) {
+                            window.location.reload();
+                        } else {
+                            checkTrainingStatus();
+                        }
+                    },
+                    error: function() {
+                        checkTrainingStatus();
+                    }
+                });
+            }, 5000);
+        }
+    });
+</script>
+{% endblock %}

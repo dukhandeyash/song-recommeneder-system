@@ -1,0 +1,213 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mb-5">
+    <div class="col-md-12 text-center">
+        <h1 class="display-4 mb-4">Discover Your Perfect Sound</h1>
+        <p class="lead">Find music that matches your mood, activity, or time of day with our smart recommendation system.</p>
+    </div>
+</div>
+
+<div class="row mb-5">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title">Search for a Song</h2>
+                <div class="input-group mb-3">
+                    <input type="text" id="search-input" class="form-control" placeholder="Search for a song or artist...">
+                    <button class="btn btn-primary" type="button" id="search-button">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </div>
+                <div id="search-results" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Playlist Tabs -->
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link active" id="mood-playlist-tab" data-toggle="tab" href="#mood-playlists">
+            Mood-Based Playlists
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" id="activity-playlist-tab" data-toggle="tab" href="#activity-playlists">
+            Activity-Based Playlists
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" id="time-playlist-tab" data-toggle="tab" href="#time-playlists">
+            Time of Day Playlists
+        </a>
+    </li>
+</ul>
+
+<!-- Playlist Container -->
+<div id="playlist-container" class="tab-content">
+    <!-- Playlists will be dynamically populated by JavaScript -->
+    <div class="row mb-5" id="mood-playlists">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="card-title">Mood-Based Playlists</h2>
+                    <p>Select a mood to generate a playlist that matches your emotional state.</p>
+                    
+                    <div class="d-flex flex-wrap gap-2 mb-4">
+                        <button class="btn btn-outline-primary mood-btn" data-mood="Happy">
+                            <i class="fas fa-grin-beam me-2"></i>Happy
+                        </button>
+                        <button class="btn btn-outline-danger mood-btn" data-mood="Angry">
+                            <i class="fas fa-angry me-2"></i>Angry
+                        </button>
+                        <button class="btn btn-outline-success mood-btn" data-mood="Relaxed">
+                            <i class="fas fa-spa me-2"></i>Relaxed
+                        </button>
+                        <button class="btn btn-outline-secondary mood-btn" data-mood="Sad">
+                            <i class="fas fa-sad-tear me-2"></i>Sad
+                        </button>
+                        <button class="btn btn-outline-info mood-btn" data-mood="Neutral">
+                            <i class="fas fa-meh me-2"></i>Neutral
+                        </button>
+                    </div>
+                    
+                    <div id="mood-playlist-results" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row mb-5" id="activity-playlists">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="card-title">Activity-Based Playlists</h2>
+                    <p>Generate playlists optimized for specific activities.</p>
+                    
+                    <div class="d-flex flex-wrap gap-2 mb-4">
+                        <button class="btn btn-outline-danger activity-btn" data-activity="Workout">
+                            <i class="fas fa-dumbbell me-2"></i>Workout
+                        </button>
+                        <button class="btn btn-outline-primary activity-btn" data-activity="Study/Focus">
+                            <i class="fas fa-book me-2"></i>Study/Focus
+                        </button>
+                        <button class="btn btn-outline-success activity-btn" data-activity="Party">
+                            <i class="fas fa-glass-cheers me-2"></i>Party
+                        </button>
+                        <button class="btn btn-outline-info activity-btn" data-activity="Relaxation">
+                            <i class="fas fa-couch me-2"></i>Relaxation
+                        </button>
+                        <button class="btn btn-outline-secondary activity-btn" data-activity="General">
+                            <i class="fas fa-music me-2"></i>General
+                        </button>
+                    </div>
+                    
+                    <div id="activity-playlist-results" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row mb-5" id="time-playlists">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="card-title">Time of Day Playlists</h2>
+                    <p>Music recommendations optimized for different times of the day.</p>
+                    
+                    <div class="d-flex flex-wrap gap-2 mb-4">
+                        <button class="btn btn-outline-warning time-btn" data-time="Morning">
+                            <i class="fas fa-sun me-2"></i>Morning
+                        </button>
+                        <button class="btn btn-outline-primary time-btn" data-time="Afternoon">
+                            <i class="fas fa-cloud-sun me-2"></i>Afternoon
+                        </button>
+                        <button class="btn btn-outline-info time-btn" data-time="Evening">
+                            <i class="fas fa-cloud-moon me-2"></i>Evening
+                        </button>
+                        <button class="btn btn-outline-dark time-btn" data-time="Night">
+                            <i class="fas fa-moon me-2"></i>Night
+                        </button>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-clock me-2"></i>Current suggested playlist: <strong>{{ suggested_time }}</strong>
+                    </div>
+                    
+                    <div id="time-playlist-results" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-5" id="recommendations-container" style="display: none;">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title">Song Recommendations</h2>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="card" id="selected-track-card">
+                            <div class="card-body">
+                                <h5 class="card-title" id="selected-track-name"></h5>
+                                <h6 class="card-subtitle mb-2 text-muted" id="selected-track-artist"></h6>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <h4>Similar Songs</h4>
+                        <div id="similar-tracks" class="row"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-5" id="compatibility-checker">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title">Compatibility Checker</h2>
+                <p>Check how well different songs go together based on audio features.</p>
+                
+                <div class="mb-3">
+                    <label class="form-label">Select songs to check compatibility:</label>
+                    <div class="input-group mb-3">
+                        <input type="text" id="compatibility-search" class="form-control" placeholder="Search for songs to add...">
+                        <button class="btn btn-primary" type="button" id="compatibility-search-btn">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="compatibility-search-results" class="mb-3"></div>
+                
+                <div class="mb-3">
+                    <h5>Selected Songs:</h5>
+                    <ul id="compatibility-selected-songs" class="list-group"></ul>
+                </div>
+                
+                <button id="check-compatibility-btn" class="btn btn-primary" disabled>
+                    <i class="fas fa-check-circle me-2"></i>Check Compatibility
+                </button>
+                
+                <div id="compatibility-results" class="mt-3" style="display: none;">
+                    <h5>Compatibility Score:</h5>
+                    <div class="progress">
+                        <div id="compatibility-progress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <p id="compatibility-score" class="mt-2"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // This will be replaced by the main.js file
+</script>
+{% endblock %}
