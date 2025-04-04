@@ -4,11 +4,22 @@ import numpy as np
 import os
 import datetime
 from spotify_utils import SpotifyAPI, RecommendationEngine
+from fuzzywuzzy import process
 
 app = Flask(__name__)
 
 # Initialize Spotify API and Recommendation Engine
 spotify_api = SpotifyAPI()
+
+# Load processed tracks for local recommendations
+def load_processed_tracks():
+    try:
+        return pd.read_csv('models/processed_tracks.csv')
+    except Exception as e:
+        print(f"Error loading processed tracks: {e}")
+        return None
+
+processed_tracks = load_processed_tracks()
 
 # Check if models directory exists, if not, we need to train the model first
 if not os.path.exists('models') or not os.path.exists('models/processed_tracks.csv'):
@@ -171,6 +182,92 @@ def calculate_diversity_score():
             'details': str(e),
             'diversity_score': 0
         }), 500
+
+@app.route('/local_song_search', methods=['GET'])
+def local_song_search():
+    """
+    Search for songs in the local database using fuzzy matching.
+    """
+    if processed_tracks is None:
+        return jsonify({'error': 'Processed tracks not loaded'})
+    
+    query = request.args.get('query', '').strip()
+    if not query:
+        return jsonify([])
+    
+    # Fuzzy search across track names
+    song_names = processed_tracks['track_name'].tolist()
+    matches = process.extract(query, song_names, limit=5)  # Limit to 5 results
+    
+    # Collect matching songs
+    results = []
+    for match, score in matches:
+        if score >= 70:  # 70% similarity threshold
+            song_rows = processed_tracks[processed_tracks['track_name'] == match]
+            for _, song in song_rows.iterrows():
+                results.append({
+                    'name': song['track_name'],
+                    'artist': song['artist'],
+                    'album': song['album'],
+                    'mood': song['mood'],
+                    'activity': song['activity'],
+                    'time_of_day': song['time_of_day']
+                })
+    
+    return jsonify(results)
+
+@app.route('/local_song_recommendations', methods=['GET'])
+def local_song_recommendations():
+    """
+    Get recommendations for a song from the local database.
+    """
+    if processed_tracks is None:
+        return jsonify({'error': 'Processed tracks not loaded'})
+    
+    song_name = request.args.get('song_name', '').strip()
+    if not song_name:
+        return jsonify([])
+    
+    # Find the song in the dataset
+    song_row = processed_tracks[processed_tracks['track_name'] == song_name]
+    
+    if song_row.empty:
+        # Use fuzzy matching if exact match not found
+        song_names = processed_tracks['track_name'].tolist()
+        match = process.extractOne(song_name, song_names)
+        
+        if match and match[1] >= 80:  # 80% similarity threshold
+            song_row = processed_tracks[processed_tracks['track_name'] == match[0]]
+        else:
+            return jsonify({'error': 'Song not found'})
+    
+    # Get the first matching song
+    base_song = song_row.iloc[0]
+    
+    # Find similar songs based on mood and activity
+    similar_songs = processed_tracks[
+        (processed_tracks['mood'] == base_song['mood']) | 
+        (processed_tracks['activity'] == base_song['activity'])
+    ]
+    
+    # Exclude the base song
+    similar_songs = similar_songs[similar_songs['track_name'] != base_song['track_name']]
+    
+    # Take top 5 recommendations
+    recommendations = similar_songs.head(5)
+    
+    results = []
+    for _, song in recommendations.iterrows():
+        results.append({
+            'name': song['track_name'],
+            'artist': song['artist'],
+            'album': song['album'],
+            'mood': song['mood'],
+            'activity': song['activity'],
+            'time_of_day': song['time_of_day']
+        })
+    
+    return jsonify(results)
 
 if __name__ == '__main__':
     app.run(debug=True)

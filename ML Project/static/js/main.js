@@ -160,14 +160,19 @@ $(document).ready(function() {
         // Detailed error checking
         if (!predefinedPlaylists) {
             console.error('predefinedPlaylists is UNDEFINED');
+            container.html('<div class="alert alert-danger">No playlists found</div>');
             return;
         }
 
         if (!playlists) {
             console.error(`No playlists found for ${playlistType}`);
             console.error('Available playlist types:', Object.keys(predefinedPlaylists));
+            container.html(`<div class="alert alert-danger">No playlists found for ${playlistType}</div>`);
             return;
         }
+
+        // Create a container to hold all categories
+        const playlistsHtml = $('<div class="playlist-categories"></div>');
 
         // Iterate through all categories in the playlist object
         Object.entries(playlists).forEach(([category, tracks]) => {
@@ -183,9 +188,6 @@ $(document).ready(function() {
                                 <th>#</th>
                                 <th>Track Name</th>
                                 <th>Artist</th>
-                                <th>Danceability</th>
-                                <th>Energy</th>
-                                <th>Valence</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -194,9 +196,6 @@ $(document).ready(function() {
                                     <td>${index + 1}</td>
                                     <td>${track.name}</td>
                                     <td>${track.artist}</td>
-                                    <td>${track.features.danceability ? track.features.danceability.toFixed(2) : 'N/A'}</td>
-                                    <td>${track.features.energy ? track.features.energy.toFixed(2) : 'N/A'}</td>
-                                    <td>${track.features.valence ? track.features.valence.toFixed(2) : 'N/A'}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -204,48 +203,55 @@ $(document).ready(function() {
                 </div>
             `;
             
-            container.append(tableHtml);
+            playlistsHtml.append(tableHtml);
         });
+
+        // Append the entire playlist categories to the container
+        container.append(playlistsHtml);
 
         // Final check
         if (container.children().length === 0) {
             console.error('No playlist categories were rendered');
+            container.html('<div class="alert alert-warning">No playlists could be rendered</div>');
         }
     }
 
-    // Default to rendering Mood playlists when page loads
-    $(document).ready(function() {
-        console.log('Document Ready - Predefined Playlists:', predefinedPlaylists);
-        renderPlaylists(predefinedPlaylists.moodPlaylists, 'Mood Playlists');
-    });
+    // Ensure playlists are rendered on page load and tab click
+    function initializePlaylists() {
+        console.log('Initializing Playlists');
+        console.log('Available Playlist Types:', Object.keys(predefinedPlaylists));
+        
+        // Try to render Time of Day Playlists
+        if (predefinedPlaylists.timeOfDayPlaylists) {
+            renderPlaylists(predefinedPlaylists.timeOfDayPlaylists, 'Time of Day Playlists');
+        } else {
+            console.error('Time of Day Playlists not found');
+            $('#playlist-container').html('<div class="alert alert-danger">Time of Day Playlists not found</div>');
+        }
+    }
+
+    // Call initialization on document ready
+    $(document).ready(initializePlaylists);
 
     // Tab click handlers
-    $('#mood-playlist-tab').on('click', function(e) {
-        e.preventDefault();
-        renderPlaylists(predefinedPlaylists.moodPlaylists, 'Mood Playlists');
-    });
-
-    $('#activity-playlist-tab').on('click', function(e) {
-        e.preventDefault();
-        renderPlaylists(predefinedPlaylists.activityPlaylists, 'Activity Playlists');
-    });
-
-    $('#time-playlist-tab').on('click', function(e) {
-        e.preventDefault();
-        console.log('Time of Day Playlists Object:', predefinedPlaylists.timeOfDayPlaylists);
-        renderPlaylists(predefinedPlaylists.timeOfDayPlaylists, 'Time of Day Playlists');
-    });
-
-    // Smooth tab switching functionality
     $('.nav-tabs .nav-link').on('click', function(e) {
         e.preventDefault();
-        $(this).tab('show');
+        const playlistType = $(this).attr('id').replace('-playlist-tab', '');
         
-        // Get the target playlist type
-        const playlistType = $(this).attr('id').replace('-playlist-tab', 'Playlists');
-        
-        // Render corresponding playlists
-        renderPlaylists(predefinedPlaylists[playlistType], playlistType);
+        switch(playlistType) {
+            case 'mood':
+                renderPlaylists(predefinedPlaylists.moodPlaylists, 'Mood Playlists');
+                break;
+            case 'activity':
+                renderPlaylists(predefinedPlaylists.activityPlaylists, 'Activity Playlists');
+                break;
+            case 'time':
+                renderPlaylists(predefinedPlaylists.timeOfDayPlaylists, 'Time of Day Playlists');
+                break;
+            default:
+                console.error('Unknown playlist type:', playlistType);
+                $('#playlist-container').html('<div class="alert alert-danger">Invalid playlist type</div>');
+        }
     });
 
     // Search functionality
@@ -263,23 +269,52 @@ $(document).ready(function() {
     });
     
     function searchTracks(query) {
-        $('#search-results').html('<div class="text-center"><div class="spinner-border" role="status"></div><p>Searching...</p></div>');
+        // Clear previous results and show loading
+        $('#search-results').html(`
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>
+                <p class="mt-2">Searching for "${query}"...</p>
+            </div>
+        `);
         
         $.ajax({
             url: '/search',
             type: 'GET',
             data: { query: query },
+            timeout: 10000,  // 10-second timeout
             success: function(data) {
-                displaySearchResults(data);
+                // Ensure the data is an array and not null
+                const tracks = Array.isArray(data) ? data : [];
+                displaySearchResults(tracks);
             },
-            error: function(error) {
-                $('#search-results').html('<div class="alert alert-danger">Error searching for tracks. Please try again.</div>');
+            error: function(xhr, status, error) {
+                let errorMessage = 'Error searching for tracks.';
+                
+                // More detailed error handling
+                if (status === 'timeout') {
+                    errorMessage = 'Search timed out. Please try again.';
+                } else if (xhr.status === 404) {
+                    errorMessage = 'Search endpoint not found.';
+                } else if (xhr.status === 500) {
+                    errorMessage = 'Server error. Please try again later.';
+                }
+                
+                $('#search-results').html(`
+                    <div class="alert alert-danger">
+                        ${errorMessage}
+                        <br>
+                        <small>Details: ${error}</small>
+                    </div>
+                `);
                 console.error('Error searching for tracks:', error);
             }
         });
     }
     
     function displaySearchResults(tracks) {
+        // Clear loading state
         if (tracks.length === 0) {
             $('#search-results').html('<div class="alert alert-info">No tracks found. Try a different search term.</div>');
             return;
@@ -294,17 +329,14 @@ $(document).ready(function() {
             
             html += `
                 <div class="col-md-4 mb-3">
-                    <div class="card track-card" data-track-id="${track.id}" data-track-name="${track.name}" data-track-artist="${track.artist}">
+                    <div class="card track-card track-search-item" 
+                         data-track-id="${track.id}" 
+                         data-track-name="${track.name}" 
+                         data-track-artist="${track.artist}">
                         ${imageHtml}
                         <div class="card-body">
                             <h5 class="card-title">${track.name}</h5>
                             <h6 class="card-subtitle mb-2 text-muted">${track.artist}</h6>
-                            <p class="card-text">
-                                Features:
-                                ${Object.entries(track.features).map(([key, value]) => 
-                                    `<br>${key}: ${value.toFixed(2)}`
-                                ).join('')}
-                            </p>
                         </div>
                     </div>
                 </div>
@@ -313,6 +345,19 @@ $(document).ready(function() {
         
         html += '</div>';
         $('#search-results').html(html);
+        
+        // Add click event to open YouTube search for each track
+        $('.track-search-item').on('click', function() {
+            const trackName = $(this).data('track-name');
+            const trackArtist = $(this).data('track-artist');
+            
+            // Construct YouTube search URL
+            const searchQuery = encodeURIComponent(`${trackName} ${trackArtist}`);
+            const youtubeSearchUrl = `https://www.youtube.com/results?search_query=${searchQuery}`;
+            
+            // Open in a new tab
+            window.open(youtubeSearchUrl, '_blank');
+        });
     }
     
     // Mood-based playlists
@@ -400,7 +445,7 @@ $(document).ready(function() {
         }
         
         let html = '<div class="playlist-container"><table class="table table-striped">';
-        html += '<thead><tr><th>#</th><th>Track</th><th>Artist</th><th>Features</th></tr></thead><tbody>';
+        html += '<thead><tr><th>#</th><th>Track</th><th>Artist</th></tr></thead><tbody>';
         
         tracks.forEach((track, index) => {
             html += `
@@ -408,13 +453,6 @@ $(document).ready(function() {
                     <td>${index + 1}</td>
                     <td>${track.track_name}</td>
                     <td>${track.artist}</td>
-                    <td>
-                        <small>
-                            Energy: ${track.energy} | 
-                            Danceability: ${track.danceability} | 
-                            Valence: ${track.valence}
-                        </small>
-                    </td>
                 </tr>
             `;
         });
@@ -639,5 +677,138 @@ $(document).ready(function() {
     // Remove Track from Diversity List
     $('#diversity-tracks').on('click', '.remove-track-diversity', function() {
         $(this).closest('.track-item').remove();
+    });
+
+    // Add local song search functionality
+    function localSongSearch() {
+        const query = $('#local-song-search-input').val().trim();
+        
+        if (query === '') {
+            $('#local-song-search-results').html('<div class="alert alert-info">Please enter a song name.</div>');
+            return;
+        }
+        
+        $.ajax({
+            url: '/local_song_search',
+            method: 'GET',
+            data: { query: query },
+            success: function(data) {
+                displayLocalSongSearchResults(data);
+            },
+            error: function(error) {
+                $('#local-song-search-results').html('<div class="alert alert-danger">Error searching for local tracks. Please try again.</div>');
+                console.error('Error searching for local tracks:', error);
+            }
+        });
+    }
+
+    function displayLocalSongSearchResults(tracks) {
+        if (tracks.length === 0) {
+            $('#local-song-search-results').html('<div class="alert alert-info">No tracks found. Try a different search term.</div>');
+            return;
+        }
+        
+        let html = '<div class="row">';
+        
+        tracks.forEach(track => {
+            html += `
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">${track.name}</h5>
+                            <h6 class="card-subtitle mb-2 text-muted">${track.artist}</h6>
+                            <p class="card-text">
+                                <strong>Album:</strong> ${track.album}<br>
+                                <strong>Mood:</strong> ${track.mood}<br>
+                                <strong>Activity:</strong> ${track.activity}<br>
+                                <strong>Time of Day:</strong> ${track.time_of_day}
+                            </p>
+                            <button class="btn btn-primary get-local-recommendations" 
+                                    data-song-name="${track.name}">
+                                Get Recommendations
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        
+        // Add note about limited results
+        if (tracks.length === 5) {
+            html += `
+                <div class="alert alert-info mt-3">
+                    Showing top 5 results. Refine your search for more specific matches.
+                </div>
+            `;
+        }
+        
+        $('#local-song-search-results').html(html);
+        
+        // Add click event for recommendation buttons
+        $('.get-local-recommendations').on('click', function() {
+            const songName = $(this).data('song-name');
+            getLocalSongRecommendations(songName);
+        });
+    }
+
+    function getLocalSongRecommendations(songName) {
+        $.ajax({
+            url: '/local_song_recommendations',
+            method: 'GET',
+            data: { song_name: songName },
+            success: function(data) {
+                displayLocalSongRecommendations(songName, data);
+            },
+            error: function(error) {
+                $('#local-song-recommendations').html('<div class="alert alert-danger">Error getting recommendations. Please try again.</div>');
+                console.error('Error getting local song recommendations:', error);
+            }
+        });
+    }
+
+    function displayLocalSongRecommendations(baseSong, recommendations) {
+        if (recommendations.length === 0) {
+            $('#local-song-recommendations').html('<div class="alert alert-info">No recommendations found.</div>');
+            return;
+        }
+        
+        let html = `<h4>Recommendations for "${baseSong}"</h4>
+                    <div class="row">`;
+        
+        recommendations.forEach(track => {
+            html += `
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">${track.name}</h5>
+                            <h6 class="card-subtitle mb-2 text-muted">${track.artist}</h6>
+                            <p class="card-text">
+                                <strong>Album:</strong> ${track.album}<br>
+                                <strong>Mood:</strong> ${track.mood}<br>
+                                <strong>Activity:</strong> ${track.activity}<br>
+                                <strong>Time of Day:</strong> ${track.time_of_day}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        $('#local-song-recommendations').html(html);
+    }
+
+    // Add event listener for local song search
+    $(document).ready(function() {
+        $('#local-song-search-btn').on('click', localSongSearch);
+        
+        // Allow pressing Enter to search
+        $('#local-song-search-input').on('keypress', function(e) {
+            if (e.which === 13) {  // Enter key
+                localSongSearch();
+            }
+        });
     });
 });
